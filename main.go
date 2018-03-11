@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -26,7 +27,8 @@ func main() {
 		log.Fatalf("Error opening file: %v\n", err)
 	}
 	defer f.Close()
-	log.SetOutput(f)
+	mw := io.MultiWriter(os.Stdout, f)
+	log.SetOutput(mw)
 
 	discord, err := discordgo.New("Bot " + token)
 	if err != nil {
