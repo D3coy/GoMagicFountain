@@ -43,6 +43,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			rand.Seed(time.Now().Unix())
 			returnString += fmt.Sprintf("%v's rolls: \n", m.Author.Username)
 			cmdList := args[1:]
+			haveRolled := false
 
 			for index, cmd := range cmdList {
 				if strings.HasPrefix(cmd, "d") {
@@ -69,6 +70,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 							result := rand.Intn(i) + 1
 							total += result
 							returnString += fmt.Sprintf("\t%v: %v\n", cmd, result)
+							haveRolled = true
 						}
 						if rollQ != 1 {
 							returnString += fmt.Sprintf("Total (%v): %v\n\n", cmd, total)
@@ -78,6 +80,9 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 				} else {
 					if _, err := strconv.Atoi(cmd); err == nil {
 						continue
+					} else if !(haveRolled) {
+						returnString = fmt.Sprintf("There are no dice to roll!")
+						break
 					} else {
 						returnString = fmt.Sprintf("Invalid option: %v", cmd)
 						break
