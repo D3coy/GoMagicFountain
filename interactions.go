@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +19,69 @@ type jokeRequest struct {
 	ID     string
 	Joke   string
 	Status int
+}
+
+type diceFlag struct {
+	Action int
+	IsTrue bool
+}
+
+type dieRoll struct {
+	DieType int
+	Value   int
+}
+
+type rolls struct {
+	Dice []dieRoll
+}
+
+func (r rolls) RollAll() {
+	for _, die := range r.Dice {
+		rand.Seed(time.Now().Unix())
+		die.Value = rand.Intn(die.DieType)
+	}
+}
+
+func (r rolls) OnlyTop(num int) {
+	r.Sort()
+	if num < len(r.Dice) {
+		r.Dice = r.Dice[:num]
+	}
+}
+
+func (r rolls) String() string {
+	var returnText string
+	for _, die := range r.Dice {
+		returnText += fmt.Sprintf("\t d%v: %v\n", die.DieType, die.Value)
+	}
+	return returnText
+}
+
+func (r rolls) Sort() {
+	sort.Slice(r.Dice, func(i, j int) bool {
+		return r.Dice[i].Value > r.Dice[j].Value
+	})
+}
+
+func (r rolls) GetType(dieType int) []dieRoll {
+	var dice []dieRoll
+	for _, die := range r.Dice {
+		if die.DieType == dieType {
+			dice = append(dice, die)
+		}
+	}
+	sort.Slice(r.Dice, func(i, j int) bool {
+		return dice[i].Value > dice[j].Value
+	})
+	return dice
+}
+
+func (r rolls) Total() int {
+	total := 0
+	for _, die := range r.Dice {
+		total += die.Value
+	}
+	return total
 }
 
 // messageCreate is a function that triggers upon a user
@@ -38,61 +102,80 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if args[0] == "!roll" {
 		var returnString string
 		if len(args) <= 1 {
-			returnString = "Usage: !roll [d#] [quantity]\n\nExamples:\n\t- !roll d4\n\t- !roll d10 3"
+			returnString = usage
 		} else {
-			rand.Seed(time.Now().Unix())
-			returnString += fmt.Sprintf("%v's rolls: \n", m.Author.Username)
-			cmdList := args[1:]
-			haveRolled := false
+			returnString = fmt.Sprintf("%v's rolls: \n", m.Author.Username)
+			tFlag, sFlag, errFlag := false, false, false
+			args = args[1:]
+			var tValue int
+			currentRolls := new(rolls)
 
-			for index, cmd := range cmdList {
-				if strings.HasPrefix(cmd, "d") {
+			for len(args) > 0 {
+				cmd := args[0]
+				if cmd == "-t" {
+					if v, err := strconv.Atoi(args[1]); err == nil {
+						tFlag = true
+						tValue = v
+						args = append(args[:1], args[2:]...)
+					} else {
+						returnString = "-t flag must have a number after!\n"
+						errFlag = true
+						break
+					}
+				} else if cmd == "-s" {
+					sFlag = true
+				} else if strings.HasPrefix(cmd, "d") {
 					rollQ := 1
-					if nextIndex := index + 1; nextIndex < len(cmdList) {
-						if i, err := strconv.Atoi(cmdList[nextIndex]); err == nil {
+					if 1 < len(args) {
+						if i, err := strconv.Atoi(args[1]); err == nil {
 							if i < 10 {
 								rollQ = i
-							} else if i > 10 {
-								returnString = "You can only have between 1 and 9 rolls at a time!"
+								args = append(args[:1], args[2:]...)
+							} else if i >= 10 {
+								returnString = "You can only have up to 9 rolls at a time!\n"
+								errFlag = true
 								break
 							}
 						}
 					}
 
-					i, err := strconv.Atoi(cmd[1:])
-					if err != nil {
-						log.Printf("Error converting string to int: %v\n", err)
-						returnString = fmt.Sprintf("%v is not a number!~", args[1][1:])
-						break
-					} else {
-						total := 0
+					if i, err := strconv.Atoi(cmd[1:]); err == nil {
 						for count := rollQ; count > 0; count-- {
-							result := rand.Intn(i) + 1
-							total += result
-							returnString += fmt.Sprintf("\t%v: %v\n", cmd, result)
-							haveRolled = true
+							roll := dieRoll{i, rand.Intn(i) + 1}
+							currentRolls.Dice = append(currentRolls.Dice, roll)
 						}
-						if rollQ != 1 {
-							returnString += fmt.Sprintf("Total (%v): %v\n\n", cmd, total)
-						}
+					} else {
+						log.Printf("Error converting string to int: %v\n", err)
+						returnString = fmt.Sprintf("%v is not a number!~\n", args[1][1:])
+						errFlag = true
+						break
 					}
 
 				} else {
-					if _, err := strconv.Atoi(cmd); err == nil {
-						continue
-					} else if !(haveRolled) {
-						returnString = fmt.Sprintf("There are no dice to roll!")
-						break
-					} else {
-						returnString = fmt.Sprintf("Invalid option: %v", cmd)
-						break
-					}
+					returnString = fmt.Sprintf("Invalid option: %v\n", cmd)
+					errFlag = true
+					break
 				}
+
+				args = args[1:]
+			}
+			if !errFlag && (len(currentRolls.Dice) != 0) {
+				currentRolls.RollAll()
+				if tFlag {
+					currentRolls.OnlyTop(tValue)
+				} else if sFlag {
+					currentRolls.Sort()
+				}
+				returnString += fmt.Sprint(currentRolls)
+				returnString += fmt.Sprintf("Total: %v", currentRolls.Total())
+			} else if !errFlag {
+			} else if len(currentRolls.Dice) == 0 {
+				returnString = "There are no dice to roll!\n"
 			}
 		}
-
 		log.Printf(fmt.Sprintf("User %v (id:%v): \n%v", m.Author.Username, m.Author.ID, returnString))
 		s.ChannelMessageSend(m.ChannelID, returnString)
+		return
 	}
 
 	if args[0] == "!joke" {
