@@ -40,7 +40,12 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		} else {
 			args = args[1:]
 			returnString = fmt.Sprintf("%v's rolls: \n", m.Author.Username)
-			returnString += dice.RollDice(args)
+			if text, err := dice.RollDice(args); err != nil {
+				returnString = fmt.Sprintln(err.Error())
+				returnString += usage
+			} else {
+				returnString += text
+			}
 		}
 		log.Printf(fmt.Sprintf("User %v (id:%v): \n%v", m.Author.Username, m.Author.ID, returnString))
 		s.ChannelMessageSend(m.ChannelID, returnString)
@@ -51,19 +56,19 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		client := &http.Client{}
 		req, err := http.NewRequest("GET", "https://icanhazdadjoke.com/", nil)
 		if err != nil {
-			log.Printf("Error building request: %v\n", err)
+			log.Println("Error building request:", err)
 		}
 
 		req.Header.Add("Accept", "application/json")
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Printf("Failed get joke: %v\n", err)
+			log.Println("Failed get joke:", err)
 		}
 		defer resp.Body.Close()
 
 		contents, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Printf("Failed to read contents: %v\n", err)
+			log.Println("Failed to read contents:", err)
 		}
 
 		jokeReq := new(jokeRequest)

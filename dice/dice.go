@@ -1,6 +1,7 @@
 package dice
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -73,7 +74,7 @@ func (r rolls) Total() int {
 // dice to roll along with their quantities. The
 // flags must be in the beginning, and it uses os.Args
 // and golang's flag package to parse for them
-func RollDice(args []string) string {
+func RollDice(args []string) (string, error) {
 
 	var topFlag int
 	var sortFlag bool
@@ -86,8 +87,7 @@ func RollDice(args []string) string {
 	diceFlagSet.BoolVar(&sortFlag, "s", false, "This will sort the roll results")
 	err := diceFlagSet.Parse(args)
 	if err != nil {
-		errFlag = true
-		return strings.Split(err.Error(), ":")[0] // This gets the first part of the error with failed flag
+		return "", errors.New(strings.Split(err.Error(), ":")[0]) // This gets the first part of the error with failed flag
 	}
 	args = diceFlagSet.Args()
 
@@ -97,14 +97,14 @@ func RollDice(args []string) string {
 			rollQ := 1
 			if 1 < len(args) {
 				if i, err := strconv.Atoi(args[1]); err == nil {
-					if i < 10 {
+					if i <= 10 {
 						rollQ = i
 						args = append(args[:1], args[2:]...)
-					} else if i >= 10 {
-						returnString = "You can only have up to 9 rolls at a time!\n"
-						errFlag = true
-						break
+					} else if i > 10 {
+						return "", errors.New("you can only have up to 9 rolls at a time")
 					}
+				} else {
+					log.Println("Error converting string to int:", err)
 				}
 			}
 
@@ -114,16 +114,12 @@ func RollDice(args []string) string {
 					currentRolls.Dice = append(currentRolls.Dice, roll)
 				}
 			} else {
-				log.Printf("Error converting string to int: %v\n", err)
-				returnString = fmt.Sprintf("%v is not a number!~\n", args[1][1:])
-				errFlag = true
-				break
+				log.Println("Error converting string to int:", err)
+				return "", fmt.Errorf("%v is an invalid die", cmd)
 			}
 
 		} else {
-			returnString = fmt.Sprintf("Invalid option: %v\n", cmd)
-			errFlag = true
-			break
+			return "", fmt.Errorf("invalid option: %v", cmd)
 		}
 
 		args = args[1:]
@@ -136,10 +132,9 @@ func RollDice(args []string) string {
 			currentRolls.Sort()
 		}
 		returnString += fmt.Sprint(currentRolls)
-		returnString += fmt.Sprintf("Total: %v", currentRolls.Total())
-	} else if !errFlag {
+		returnString += fmt.Sprintln("Total:", currentRolls.Total())
 	} else if len(currentRolls.Dice) == 0 {
-		returnString = "There are no dice to roll!\n"
+		return "", errors.New("there are no dice to roll")
 	}
-	return returnString
+	return returnString, nil
 }
