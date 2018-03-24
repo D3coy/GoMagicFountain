@@ -101,7 +101,7 @@ func RollDice(args []string) (string, error) {
 						rollQ = i
 						args = append(args[:1], args[2:]...)
 					} else if i > 10 {
-						return "", errors.New("you can only have up to 9 rolls at a time")
+						return "", errors.New("you can only have up to 10 rolls at a time")
 					}
 				} else {
 					log.Println("Error converting string to int:", err)
