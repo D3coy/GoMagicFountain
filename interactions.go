@@ -27,6 +27,10 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
+	if m.Content == "" {
+		return
+	}
+
 	args := strings.Fields(m.Content)
 
 	if args[0] == "ping" {
