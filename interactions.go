@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/d3coy/GoMagicFountain/dice"
+	"github.com/D3coy/GoMagicFountain/dice"
 )
 
 type jokeRequest struct {
